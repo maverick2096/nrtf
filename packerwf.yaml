@@ -1,0 +1,56 @@
+name: Build RHEL 10 Image with Packer
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "**/*.pkr.hcl"
+      - "scripts/**"
+  workflow_dispatch:
+
+jobs:
+  packer:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install QEMU + deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            qemu-kvm \
+            libvirt-daemon-system \
+            libvirt-clients \
+            bridge-utils \
+            virtinst \
+            curl \
+            unzip
+
+      - name: Install Packer
+        uses: hashicorp/setup-packer@v3
+        with:
+          version: latest
+
+      - name: Packer Init
+        run: packer init .
+
+      - name: Packer Validate
+        env:
+          PKR_VAR_iso_url: ${{ secrets.RHEL_ISO_URL }}
+          PKR_VAR_iso_checksum: ${{ secrets.RHEL_ISO_CHECKSUM }}
+          PKR_VAR_ssh_username: ${{ secrets.PACKER_SSH_USER }}
+          PKR_VAR_ssh_password: ${{ secrets.PACKER_SSH_PASS }}
+        run: packer validate .
+
+      - name: Packer Build
+        env:
+          PKR_VAR_iso_url: ${{ secrets.RHEL_ISO_URL }}
+          PKR_VAR_iso_checksum: ${{ secrets.RHEL_ISO_CHECKSUM }}
+          PKR_VAR_ssh_username: ${{ secrets.PACKER_SSH_USER }}
+          PKR_VAR_ssh_password: ${{ secrets.PACKER_SSH_PASS }}
+        run: |
+          packer build \
+            -color=false \
+            -on-error=abort .
